@@ -26,6 +26,7 @@ public class AuditPlan {
 
 	@Id
 	@GeneratedValue(strategy = GenerationType.IDENTITY)
+	@Column(name = "audit_id")
 	private int id;
 
 	@ManyToOne(fetch=FetchType.LAZY)

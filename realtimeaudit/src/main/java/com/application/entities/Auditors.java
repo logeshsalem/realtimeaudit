@@ -41,10 +41,10 @@ public class Auditors {
 	private double homeLon;
 	
 	@Column(name="workload_capacity_hours")
-	private int workLoadCapacityHours;
+	private double workLoadCapacityHours;
 	
 	@Column(name="current_assigned_hours")
-	private int currentAssignedHours;
+	private double currentAssignedHours;
 		
 	
 	@Enumerated(EnumType.STRING)
