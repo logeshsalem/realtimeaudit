@@ -1,7 +1,5 @@
 package com.application.entities;
 
-import com.fasterxml.jackson.databind.PropertyNamingStrategies;
-import com.fasterxml.jackson.databind.annotation.JsonNaming;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -22,7 +20,7 @@ import lombok.Setter;
 @Setter
 @AllArgsConstructor
 @NoArgsConstructor
-@JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
+//@JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
 public class Auditors {
 	
 	
@@ -34,16 +32,16 @@ public class Auditors {
 	@Column(name="name")
 	private String name;
 	
-	@Column(name="home_lat")
+	@Column(name="home_lat", nullable = false)
 	private double homeLat;
 	
-	@Column(name="home_lon")
+	@Column(name="home_lon", nullable = false)
 	private double homeLon;
 	
-	@Column(name="workload_capacity_hours")
+	@Column(name="workload_capacity_hours", nullable = false)
 	private double workLoadCapacityHours;
 	
-	@Column(name="current_assigned_hours")
+	@Column(name="current_assigned_hours", nullable = false)
 	private double currentAssignedHours;
 		
 	

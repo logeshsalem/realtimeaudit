@@ -16,128 +16,152 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 import com.application.DTO.AssignmentRequestDTO;
 import com.application.DTO.AssignmentResponseDTO;
+import com.application.DTO.AuditPlanDTO;
+import com.application.DTO.AuditPlanResponseDTO;
 import com.application.DTO.AuditorDTO;
 import com.application.DTO.StoreDTO;
 import com.application.entities.AuditPlan;
 import com.application.entities.Auditors;
-import com.application.entities.Auditors.AvailabilityStatus;
 import com.application.entities.Store;
 import com.application.repository.AuditPlanRepository;
 import com.application.repository.AuditorRepository;
 import com.application.repository.StoreRepository;
 
+// Import these two classes for printing the JSON
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
 @Service
 public class AuditPlanServiceImpl implements AuditPlanService{
 	 
-	 
-	 @Value("${python.api.url}")
-	 private String pythonApiUrl;
+	@Value("${python.api.url}")
+	private String pythonApiUrl;
 	
-	 @Value("${python.api.key}")
-	 private String pythonApiKey;
+	@Value("${python.api.key}")
+	private String pythonApiKey;
 	 
-	 private static final Logger logger = LoggerFactory.getLogger(AuditPlanServiceImpl.class);
+	private static final Logger logger = LoggerFactory.getLogger(AuditPlanServiceImpl.class);
 	 
-	 @Autowired
-	 private RestTemplate restTemplate;
+	@Autowired
+	private RestTemplate restTemplate;
 	 
-	 @Autowired
-	 private AuditorRepository auditorRepository;
+	@Autowired
+	private AuditorRepository auditorRepository;
 	 
-	 @Autowired
-	 private StoreRepository storeRepository;
+	@Autowired
+	private StoreRepository storeRepository;
 	 
-	 @Autowired
-	 private AuditPlanRepository auditPlanRepository;
+	@Autowired
+	private AuditPlanRepository auditPlanRepository;
 	 
-	 
-
 	@Override
 	public AssignmentResponseDTO getAssignment(AssignmentRequestDTO request) {
-		//return restTemplate.postForObject(pythonApiUrl, request, AssignmentResponseDTO.class);
-		 org.springframework.http.HttpHeaders headers = new org.springframework.http.HttpHeaders();
-	        headers.set("Content-Type", "application/json"); // It's good practice to set this
-	        headers.set("X-API-Key", pythonApiKey); // Using the key injected from properties
-	        
-	        // 2. Create an HttpEntity to wrap the request body (DTO) and the headers
-	        HttpEntity<AssignmentRequestDTO> entity = new HttpEntity<>(request, headers);
-	        
-	        // 3. Define the full endpoint URL
-	        String fullUrl = pythonApiUrl + "/api/process-assignments";
+	    // --- 1. PRINTING THE OUTGOING JSON (as before) ---
+	    ObjectMapper objectMapper = new ObjectMapper(); // Helper to convert objects to JSON
+	    try {
+	        String jsonPayload = objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(request);
+	        System.out.println("=========================================================");
+	        System.out.println("SENDING JSON PAYLOAD TO PYTHON API:");
+	        System.out.println(jsonPayload);
+	        System.out.println("=========================================================");
+	    } catch (JsonProcessingException e) {
+	        logger.error("Error converting request DTO to JSON", e);
+	    }
+	    
+	    // --- 2. MAKING THE API CALL (as before) ---
+	    org.springframework.http.HttpHeaders headers = new org.springframework.http.HttpHeaders();
+	    headers.set("Content-Type", "application/json");
+	    headers.set("X-API-Key", pythonApiKey);
+	    
+	    HttpEntity<AssignmentRequestDTO> entity = new HttpEntity<>(request, headers);
+	    String fullUrl = pythonApiUrl + "/api/process-assignments";
 
-	        // 4. Use restTemplate.exchange() which allows sending custom headers
-	        // It sends the entity, and expects a response that can be mapped to AssignmentResponseDto
-	        ResponseEntity<AssignmentResponseDTO> response = restTemplate.exchange(
-	            fullUrl,
-	            HttpMethod.POST,
-	            entity,
-	            AssignmentResponseDTO.class
-	        );
+	    ResponseEntity<AssignmentResponseDTO> response = restTemplate.exchange(
+	        fullUrl,
+	        HttpMethod.POST,
+	        entity,
+	        AssignmentResponseDTO.class
+	    );
 
-	        // 5. Return the body of the response
-	        return response.getBody();
+	    // --- 3. NEW: PRINTING THE RECEIVED JSON ---
+	    try {
+	        // Get the parsed response body and convert it back to a pretty JSON string
+	        String receivedJson = objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(response.getBody());
+	        System.out.println("=========================================================");
+	        System.out.println("RECEIVED JSON RESPONSE FROM PYTHON API:");
+	        System.out.println(receivedJson);
+	        System.out.println("=========================================================");
+	    } catch (JsonProcessingException e) {
+	        logger.error("Error converting response DTO to JSON for printing", e);
+	    }
+
+	    // --- 4. RETURNING THE RESPONSE (as before) ---
+	    return response.getBody();
 	}
 
 	@Override
 	public List<AuditPlan> generateAndSaveAuditPlan() {
+	    logger.info("--- Starting generateAndSaveAuditPlan ---");
+	    
 		List<Auditors> auditors = auditorRepository.findAll();
 		List<Store> stores = storeRepository.findAll();
-		
-		System.out.println("--- CHECKPOINT 2: Fetched " + auditors.size() + " auditors and " + stores.size() + " stores from DB ---");
+		logger.info("Fetched {} auditors and {} stores from DB.", auditors.size(), stores.size());
 
-        // 2. MAP
+        // MAP entities to DTO
         AssignmentRequestDTO requestDto = mapEntitiesToRequestDTO(auditors, stores);
-        System.out.println("--- CHECKPOINT 3: Mapped entities to DTO. Calling Python API... ---");
+        logger.info("Mapped entities to DTO. Calling Python API...");
 
-        // 3. CALL
+        // CALL the Python API
         AssignmentResponseDTO predictionResponse = getAssignment(requestDto);
-        System.out.println("--- CHECKPOINT 4: Successfully received response from Python API ---");
+        logger.info("Successfully received response from Python API.");
 
-        // 4. PROCESS & SAVE
+        // PROCESS & SAVE the results
         List<AuditPlan> savedAssignments = processAndSaveAuditPlan(predictionResponse);
-        System.out.println("--- CHECKPOINT 5: Finished processing and saving assignments. ---");
-		AssignmentRequestDTO requestDTO = mapEntitiesToRequestDTO(auditors, stores);
-		
-		AssignmentResponseDTO predictionResponseDTO = getAssignment(requestDTO);
-		return processAndSaveAuditPlan(predictionResponse);
+        logger.info("Finished processing and saving {} new assignments.", savedAssignments.size());
+
+        // --- FIX 1: Removed redundant/duplicated code from this method ---
+		return savedAssignments;
 	}
 
 	@Override
 	public AssignmentRequestDTO mapEntitiesToRequestDTO(List<Auditors> auditors, List<Store> stores) {
-		List<AuditorDTO> auditorDTO = auditors.stream().map(auditor -> {
+		List<AuditorDTO> auditorDTOs = auditors.stream().map(auditor -> {
 			AuditorDTO dto = new AuditorDTO();
 			dto.setAuditorId(auditor.getId());
 			dto.setLatitude(auditor.getHomeLat());
 			dto.setLongitude(auditor.getHomeLon());
+			
 			Auditors.AvailabilityStatus status = auditor.getAvailabilityStatus();
+			
+			// --- FIX 2: Corrected String case to match Python validation ---
 			if (status == Auditors.AvailabilityStatus.AVAILABLE) {
-	            dto.setAvailabilityStatus("AVAILABLE");
+	            dto.setAvailabilityStatus("Available"); // Must be Title Case
 	        } else {
-	            // Treat ON_LEAVE, UNAVAILABLE, or even null as "Unavailable" for the API.
-	            dto.setAvailabilityStatus("UNAVAILABLE");
+	            dto.setAvailabilityStatus("Unavailable"); // Must be Title Case
 	        }
 			return dto;
 		}).collect(Collectors.toList());
 		
 		 List<StoreDTO> storeDtos = stores.stream().map(store -> {
 	            StoreDTO dto = new StoreDTO();
-	            dto.setStoreId(store.getName()); // Assuming name is the unique ID
+	            // --- FIX 3: Changed from getName() to getId() to use numeric ID ---
+	            dto.setStoreId(store.getId()); 
 	            dto.setLatitude(store.getLocationLat());
 	            dto.setLongitude(store.getLocationLon());
+	            
 	            Store.StoreStatus status = store.getStoreStatus();
 
-	            // 2. Compare the enum constant.
+	            // --- FIX 2: Corrected String case to match Python validation ---
 	            if (status == Store.StoreStatus.OPEN) {
-	                dto.setStoreStatus("OPEN");
+	                dto.setStoreStatus("Open"); // Must be Title Case
 	            } else {
-	                // Treat CLOSED, RENOVATING, or null as "Closed" for the API.
-	                dto.setStoreStatus("CLOSED");
+	                dto.setStoreStatus("Closed"); // Must be Title Case
 	            }
 	            return dto;
 	        }).collect(Collectors.toList());
 		 
 		 AssignmentRequestDTO requestDTO = new AssignmentRequestDTO();
-		 requestDTO.setAuditors(auditorDTO);
+		 requestDTO.setAuditors(auditorDTOs);
 		 requestDTO.setStores(storeDtos);
 		 return requestDTO;
 	}
@@ -146,56 +170,42 @@ public class AuditPlanServiceImpl implements AuditPlanService{
 	public List<AuditPlan> processAndSaveAuditPlan(AssignmentResponseDTO prediction) {
 	    List<AuditPlan> savedAssignments = new ArrayList<>();
 
-	    // This initial check is good and remains the same.
 	    if (prediction == null || prediction.getData() == null || prediction.getData().getStores() == null) {
 	        logger.warn("Prediction data is null or empty. Skipping assignment processing.");
 	        return savedAssignments;
 	    }
 
-	    // Correctly cast the generic list from the response.
 	    List<Map<String, Object>> storeResults = (List<Map<String, Object>>) (List<?>) prediction.getData().getStores();
 	    logger.info("Processing {} potential store assignments from API response.", storeResults.size());
 
-	    // Loop through each assignment suggested by the AI
 	    for (Map<String, Object> storeResult : storeResults) {
 	        Object storeIdObj = storeResult.get("store_id");
 	        Object auditorIdObj = storeResult.get("assigned_auditor_id");
 
-	        // Only process if the AI actually assigned an auditor and a store
 	        if (auditorIdObj != null && storeIdObj != null) {
 	            
-	            // --- FIX 1: Correctly parse numeric IDs from the response ---
-	            // The response JSON contains numbers, not strings.
-	            Integer storeId = (int) ((Number) storeIdObj).longValue();
-	            Integer auditorId = (int) ((Number) auditorIdObj).longValue();
+	            // --- FIX 4: Changed from Integer to Long to match repository method ---
+	            int storeId = (int) ((Number) storeIdObj).longValue();
+	            int  auditorId = (int) ((Number) auditorIdObj).longValue();
 
-	            // --- FIX 2: Use the standard findById method, not the deleted findByName ---
-	            // Fetch both entities from the database using their numeric primary keys.
 	            Optional<Auditors> auditorOptional = auditorRepository.findById(auditorId);
 	            Optional<Store> storeOptional = storeRepository.findById(storeId);
 
-	            // --- FIX 3: Check if both entities were actually found ---
 	            if (auditorOptional.isPresent() && storeOptional.isPresent()) {
-	                // Get the actual entities from the Optional wrapper.
 	                Auditors auditorEntity = auditorOptional.get();
 	                Store storeEntity = storeOptional.get();
 	                
 	                AuditPlan plan = new AuditPlan();
 	                
-	                // --- FIX 4: Call the correct setter methods ---
-	                // Assuming your setters are named setAuditors and setStore.
 	                plan.setAuditors(auditorEntity);
 	                plan.setStore(storeEntity);
 
-	                // Set default values using the correct enum constants.
 	                plan.setAuditStatus(AuditPlan.AuditStatus.PLANNED);
 	                plan.setAuditPriority(AuditPlan.AuditPriority.MEDIUM);
 
-	                // Save the new assignment plan to the database.
 	                savedAssignments.add(auditPlanRepository.save(plan));
 	                
 	            } else {
-	                // Log a clear warning if an ID from the AI response doesn't exist in our DB.
 	                logger.warn("Could not create assignment. Auditor or Store not found in DB for IDs: AuditorID={}, StoreID={}",
 	                            auditorId, storeId);
 	            }
@@ -204,6 +214,122 @@ public class AuditPlanServiceImpl implements AuditPlanService{
 	    return savedAssignments;
 	}
 
-	
+	@Override
+	public AuditPlan reassignStore(Store storeToReassign, List<Auditors> candidateAuditors) {
+		logger.info("Attempting to reassign store ID: {}. Found {} candidate auditors.", storeToReassign.getId(), candidateAuditors.size());
 
+        if (candidateAuditors.isEmpty()) {
+            logger.warn("No available auditors to reassign store ID: {}. Un-assigning the store.", storeToReassign.getId());
+            // Find the old assignment and delete it, as no replacement is possible.
+            auditPlanRepository.findByStore(storeToReassign).ifPresent(oldPlan -> {
+            	auditPlanRepository.delete(oldPlan);
+            });
+            return null; // Return null to indicate no new assignment was made.
+        }
+
+        // 1. Create a focused request for the Python API
+        AssignmentRequestDTO requestDTO = mapSingleStoreToRequestDTO(storeToReassign, candidateAuditors);
+
+        // 2. Call the Python API
+        AssignmentResponseDTO prediction = getAssignment(requestDTO);
+
+        // 3. Process the response to find the new auditor
+        if (prediction != null && prediction.getData() != null && prediction.getData().getStores() != null) {
+            List<Map<String, Object>> storeResults = (List<Map<String, Object>>) (List<?>) prediction.getData().getStores();
+            
+            if (!storeResults.isEmpty()) {
+                Map<String, Object> result = storeResults.get(0); // We only sent one store
+                Object newAuditorIdObj = result.get("assigned_auditor_id");
+
+                if (newAuditorIdObj != null) {
+                    int newAuditorId = (int) ((Number) newAuditorIdObj).longValue();
+                    
+                    // Find the new auditor entity
+                    Optional<Auditors> newAuditorOptional = auditorRepository.findById(newAuditorId);
+                    
+                    if (newAuditorOptional.isPresent()) {
+                        // Find the original assignment plan for this store
+                        Optional<AuditPlan> existingPlanOptional = auditPlanRepository.findByStore(storeToReassign);
+                        if (existingPlanOptional.isPresent()) {
+                            AuditPlan planToUpdate = existingPlanOptional.get();
+                            planToUpdate.setAuditors(newAuditorOptional.get()); // Update with the new auditor
+                            logger.info("Successfully reassigned store ID: {} to new auditor ID: {}", storeToReassign.getId(), newAuditorId);
+                            return auditPlanRepository.save(planToUpdate); // Save and return the updated plan
+                        }
+                    }
+                }
+            }
+        }
+        
+        // If the AI failed to assign anyone, delete the old assignment.
+        logger.warn("AI did not assign a new auditor for store ID: {}. Un-assigning.", storeToReassign.getId());
+        auditPlanRepository.findByStore(storeToReassign).ifPresent(oldPlan -> {
+        	auditPlanRepository.delete(oldPlan);
+        });
+        return null;
+	}
+	
+	private AssignmentRequestDTO mapSingleStoreToRequestDTO(Store store, List<Auditors> auditors) {
+        // This is a simplified version of your main mapping method.
+        List<AuditorDTO> auditorDTOs = auditors.stream().map(auditor -> {
+           AuditorDTO dto = new AuditorDTO();
+           dto.setAuditorId(auditor.getId());
+           dto.setLatitude(auditor.getHomeLat());
+           dto.setLongitude(auditor.getHomeLon());
+           dto.setAvailabilityStatus("Available"); // We know they are all available
+			return dto;
+		}).collect(Collectors.toList());
+		
+		StoreDTO storeDto = new StoreDTO();
+		storeDto.setStoreId(store.getId());
+		storeDto.setLatitude(store.getLocationLat());
+		storeDto.setLongitude(store.getLocationLon());
+		storeDto.setStoreStatus("Open"); // Assuming we only reassign open stores
+
+		AssignmentRequestDTO requestDTO = new AssignmentRequestDTO();
+		requestDTO.setAuditors(auditorDTOs);
+		requestDTO.setStores(List.of(storeDto)); // Create a list with just one store
+		return requestDTO;
+   }
+
+	@Override
+	public AuditPlanResponseDTO updateAuditPlanStatus(int auditPlanId, AuditPlanDTO updateDTO) {
+	    AuditPlan existingPlan = auditPlanRepository.findById(auditPlanId)
+	            .orElseThrow(() -> new RuntimeException("AuditPlan not found with ID: " + auditPlanId));
+
+	    if (updateDTO.getAuditStatus() != null) {
+	        existingPlan.setAuditStatus(updateDTO.getAuditStatus());
+	    }
+	    if (updateDTO.getAuditPriority() != null) {
+	        existingPlan.setAuditPriority(updateDTO.getAuditPriority());
+	    }
+
+	    // Save the entity as before
+	    AuditPlan savedPlan = auditPlanRepository.save(existingPlan);
+
+	    // --- NEW: Convert the saved entity to a DTO before returning ---
+	    // This happens WHILE THE TRANSACTION IS STILL OPEN, so lazy loading works.
+	    return convertToDTO(savedPlan);
+	}
+
+	// Add this private helper method to your service class
+	public AuditPlanResponseDTO convertToDTO(AuditPlan plan) {
+	    AuditPlanResponseDTO dto = new AuditPlanResponseDTO();
+	    dto.setAuditId(plan.getId());
+	    dto.setAuditStatus(plan.getAuditStatus().name()); // .name() converts enum to string
+	    dto.setAuditPriority(plan.getAuditPriority().name());
+	    
+	    // By calling getAuditors() and getStore() here, we trigger the lazy loading
+	    // and get the real data before the transaction closes.
+	    if (plan.getAuditors() != null) {
+	        dto.setAuditorId(plan.getAuditors().getId());
+	        dto.setAuditorName(plan.getAuditors().getName());
+	    }
+	    if (plan.getStore() != null) {
+	        dto.setStoreId(plan.getStore().getId());
+	        dto.setStoreName(plan.getStore().getName());
+	    }
+	    
+	    return dto;
+	}
 }

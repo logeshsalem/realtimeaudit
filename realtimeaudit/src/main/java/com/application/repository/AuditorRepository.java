@@ -15,5 +15,7 @@ public interface AuditorRepository extends JpaRepository<Auditors, Integer> {
 	List<Auditors> findByAvailabilityStatus(AvailabilityStatus status);
 
 	Optional<Auditors> findByName(String assignedAuditorName);
+	
+	List<Auditors> findByIdNotAndAvailabilityStatus(int id, Auditors.AvailabilityStatus status);
 
 }

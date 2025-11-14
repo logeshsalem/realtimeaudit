@@ -13,4 +13,5 @@ public interface AuditorService {
 	List<Auditors> findAvailableAuditors();
 	Optional<Auditors> findByAuditorsId(int id);
 	Auditors updateAvailabilityStatus(int id, AvailabilityStatus newStatus);
+	
 }

@@ -5,8 +5,6 @@ import java.util.Optional;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-
-import com.application.entities.Auditors;
 import com.application.entities.Store;
 import com.application.entities.Store.StoreStatus;
 import com.application.repository.StoreRepository;

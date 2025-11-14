@@ -13,7 +13,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import com.application.entities.Store;
-import com.application.entities.Store.StoreStatus;
 import com.application.service.StoreService;
 
 @RestController

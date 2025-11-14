@@ -16,7 +16,7 @@ import lombok.Setter;
 public class StoreDTO {
 
 	@JsonProperty("store_id")
-    private String storeId;
+    private int storeId;
 
     @JsonProperty("latitude")
     private double latitude;

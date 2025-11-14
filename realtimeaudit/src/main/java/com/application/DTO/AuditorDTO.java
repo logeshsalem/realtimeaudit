@@ -1,8 +1,6 @@
 package com.application.DTO;
 
-import com.application.entities.Auditors.AvailabilityStatus;
 import com.fasterxml.jackson.annotation.JsonProperty;
-
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.Getter;
